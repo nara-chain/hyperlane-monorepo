@@ -75,6 +75,35 @@ Parse the ticket description to extract the following. Ask the user to clarify a
 | **Warp fee**                     | Fee in basis points (bps), if specified (e.g. `6bps`)                                         |
 | **Fee owner**                    | Address that receives fees — defaults to the chain's `owner` if not specified                 |
 | **Type overrides**               | Any chain that should be `native` instead of `collateral`/`synthetic`                         |
+| **Yield route type**             | If the ticket mentions yield/ERC4626/vault, determine the yield subtype (see below)           |
+
+**Yield routes**: if the ticket mentions "yield", "ERC4626", "vault", "rebasing", "Aave", or the token is a known yield-bearing token (sUSDS, sDAI, etc.), it is a yield route. There are two subtypes:
+
+| Ticket language                           | Collateral type         | Synthetic type    | Behavior                                                                      |
+| ----------------------------------------- | ----------------------- | ----------------- | ----------------------------------------------------------------------------- |
+| "owner yield" / "non-rebasing"            | `collateralVault`       | `synthetic`       | Yield accrues to contract owner; owner calls `sweep()` to claim               |
+| "rebasing" / yield distributed to holders | `collateralVaultRebase` | `syntheticRebase` | Yield auto-distributes to all bridged token holders via exchange rate updates |
+
+If the ticket says "owner yield", use `collateralVault` + `synthetic`. If ambiguous, ask the user.
+
+**For `collateralVault` routes — check if the collateral token already implements ERC4626:**
+
+Run this check on the collateral token address from the ticket:
+
+```bash
+cast call <collateral-token-address> "asset()" --rpc-url $(cast chain-id <chain>)
+```
+
+- **If `asset()` returns a non-zero address** → the token IS an ERC4626 vault. Use it directly as `token` in the deploy.yaml. No vault deployment needed.
+- **If `asset()` reverts or returns zero** → the token is a plain ERC20. Warn the user:
+
+  > ⚠️ The collateral token does not implement ERC4626. You must deploy an Aave ERC4626 vault wrapping it first using [hyperlane-xyz/Aave-Vault](https://github.com/hyperlane-xyz/Aave-Vault), then replace `<VAULT_ADDRESS>` in the deploy.yaml with the deployed vault address. The vault owner controls who can `sweep()` yield — confirm the yield beneficiary with product before deploying.
+  >
+  > Real example: WETH/incentiv vault `0xB1ea329f0B79d0b213957569594ca2a9dE637215` = "Wrapped Aave Ethereum WETH" (waEthWETH), underlying = WETH `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2`
+
+  Use `<VAULT_ADDRESS>` as a placeholder in the deploy.yaml until the vault is deployed.
+
+**`collateralVaultRebase` constraint**: ALL destination chains MUST be `syntheticRebase` — you cannot mix `syntheticRebase` with `synthetic` in the same route. Each `syntheticRebase` chain requires a `collateralChainName` field pointing to the collateral chain.
 
 **Multi-collateral routes**: when the ticket lists multiple collateral chains, each gets its own `token` address. ICA owner addresses for non-Ethereum chains are often not yet known — use `<ICA_ADDRESS>` as a placeholder and flag clearly to the user.
 
@@ -200,6 +229,53 @@ The `tokenFee` on the synthetic chain lists ALL collateral chains in `feeContrac
   type: synthetic
 ```
 
+**For `collateralVault` type chains** (owner-yield ERC4626 — yield accrues to owner, not holders):
+
+> ⚠️ **Vault must be deployed before the warp route.** The `token` field is NOT the raw token being bridged — it is an ERC4626 vault wrapping the token. Use [hyperlane-xyz/Aave-Vault](https://github.com/hyperlane-xyz/Aave-Vault) to deploy the vault. Real-world examples: WETH/incentiv vault `0xB1ea329f0B79d0b213957569594ca2a9dE637215` (waEthWETH, wraps WETH), USDT/incentiv vault `0x04DA4b99FFc82f0e44DEd14c3539A6fDaD08E2fE` (wraps USDT).
+
+```yaml
+<collateral-chain>:
+  decimals: <decimals>
+  mailbox: '<mailbox-address>'
+  name: <token-name>
+  owner: '<owner-address>'
+  symbol: <token-symbol>
+  token: '<erc4626-vault-address>' # vault wrapping the token, NOT the token itself
+  type: collateralVault
+
+<synthetic-chain>:
+  decimals: <decimals>
+  mailbox: '<mailbox-address>'
+  name: <token-name>
+  owner: '<owner-address>'
+  symbol: <token-symbol>
+  type: synthetic # standard synthetic — NOT syntheticRebase
+```
+
+**For `collateralVaultRebase` type chains** (rebasing ERC4626 — yield auto-distributes to all bridged holders):
+
+> ⚠️ Same ERC4626 check as `collateralVault`: run `cast call <token> "asset()"` — if it returns a non-zero address, use the token directly; if it reverts, a vault must be deployed first.
+
+```yaml
+<collateral-chain>:
+  decimals: <decimals>
+  mailbox: '<mailbox-address>'
+  name: <token-name>
+  owner: '<owner-address>'
+  symbol: <token-symbol>
+  token: '<erc4626-vault-address>'
+  type: collateralVaultRebase
+
+<synthetic-chain>:
+  collateralChainName: <collateral-chain> # REQUIRED for syntheticRebase
+  decimals: <decimals>
+  mailbox: '<mailbox-address>'
+  name: <token-name>
+  owner: '<owner-address>'
+  symbol: <token-symbol>
+  type: syntheticRebase # ALL destinations must be syntheticRebase when collateralVaultRebase is used
+```
+
 **For `native` type chains** (chain's native gas token is being bridged — no `token`, `name`, or `symbol` field):
 
 ```yaml
@@ -235,8 +311,9 @@ The `fee-owner-address` defaults to the chain's `owner` unless separately specif
 **Rules:**
 
 - Chains are listed in alphabetical order
-- `token` field only present on `collateral` type
+- `token` field only present on `collateral`, `collateralVault`, and `collateralVaultRebase` types
 - `name` and `symbol` omitted on `native` type; `decimals` IS included
+- `collateralChainName` is REQUIRED on every `syntheticRebase` chain; omit on all other types
 - `tokenFee` goes on the synthetic chain only (or all chains if all-native route)
 - Do NOT include `interchainSecurityModule`, `proxyAdmin`, or `remoteRouters` — those are added post-deployment
 
