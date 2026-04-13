@@ -9,11 +9,13 @@ You are completing the post-registry-merge steps for a new warp route deployment
 
 ## Input
 
-The user provides a warp route ID in the format `TOKEN/chain1-chain2` (e.g. `RISE/bsc-ethereum`), or a Linear ticket URL.
+The user provides one or more warp route IDs in the format `TOKEN/chain` (stable ID — just the primary new/synthetic chain), and/or one or more Linear ticket URLs. Multiple routes can be batched into a single PR.
 
-If a Linear ticket URL is provided, fetch the ticket to extract the warp route ID and route details. Look for fields like "Route Type", "Connected Chains", and notes about ownership/ICA.
+If Linear ticket URL(s) are provided, fetch each ticket to extract the warp route ID and route details. Look for fields like "Route Type", "Connected Chains", and notes about ownership/ICA.
 
 If no warp route ID was provided, ask the user for it now.
+
+**When multiple routes are provided**, process Steps 1–5 for each route independently (each gets its own enum entry and warp monitor), then create a single combined PR in Step 6 that covers all routes.
 
 ---
 
@@ -42,19 +44,18 @@ Convert the warp route ID to a PascalCase TypeScript enum key.
 
 **Pattern** (look at existing entries in `warpIds.ts` for guidance):
 
-- Parse the warp route ID: `TOKEN/chain1-chain2-...`
-- Combine chains (PascalCase each segment) + Token: e.g. `RISE/bsc-ethereum` → `BscEthereumRISE`
+- Parse the warp route ID: `TOKEN/chain` (stable format — just the primary new/synthetic chain)
+- Combine chain (PascalCase) + Token: e.g. `USDS/igra` → `IgraUSDS`
 - For tokens with special casing already used in the file (e.g. `stHYPER`, `Re7LRT`), preserve it
 - Check existing entries in `typescript/infra/config/environments/mainnet3/warp/warpIds.ts` to find the closest analogous pattern
 
 Examples from the file:
 
-- `stHYPER = 'stHYPER/bsc-ethereum'` — token-only key when token is distinctive
-- `ArbitrumTIA = 'TIA/arbitrum'` — chain(s) + token
-- `BscHyperevmEnzoBTC = 'enzoBTC/bsc-hyperevm'` — chains + token
-- `EthereumVanaVANA = 'VANA/ethereum-vana'` — chains + token
+- `IgraUSDS = 'USDS/igra'` — chain + token (stable single-chain format)
+- `IgraWETH = 'WETH/igra'` — chain + token
+- `ArbitrumTIA = 'TIA/arbitrum'` — chain + token (older multi-chain format, still valid for existing routes)
 
-For `RISE/bsc-ethereum`, the key would be `BscEthereumRISE`.
+For `USDS/igra`, the key would be `IgraUSDS`.
 
 Confirm the derived key name makes sense before proceeding.
 
@@ -68,10 +69,10 @@ File: `typescript/infra/config/environments/mainnet3/warp/warpIds.ts`
 2. Add the new enum entry in an appropriate location (group with related routes if there's a logical section; otherwise append before the closing `}`)
 3. Use the format: `EnumKeyName = 'TOKEN/chains',`
 
-Example addition for `RISE/bsc-ethereum`:
+Example addition for `USDS/igra`:
 
 ```typescript
-  BscEthereumRISE = 'RISE/bsc-ethereum',
+  IgraUSDS = 'USDS/igra',
 ```
 
 After editing, show the user the added line and confirm the file looks correct.
@@ -300,28 +301,71 @@ If healthy, summarize the status and proceed to Step 6. If not, explain what's w
 
 ---
 
-## Step 6: Prompt User — Create PR
+## Step 6: Create PR
 
-Tell the user:
+Create the monorepo PR directly using `gh pr create`. First check out a branch:
 
-> The monorepo changes are ready for a PR. The changes include:
->
-> - `typescript/infra/config/environments/mainnet3/warp/warpIds.ts` — new enum entry
-> - `.registryrc` — updated registry commit hash
-> - Any files modified by `update-agent-config` (agent config JSONs)
->
-> **Multi-collateral routes also include:**
->
-> - `typescript/infra/config/environments/mainnet3/governance/ica/warpFees.ts` — uncommented synthetic chain entry
-> - `typescript/infra/config/environments/mainnet3/warp/configGetters/get<Name>WarpConfig.ts` — new configGetter
-> - `typescript/infra/config/warp.ts` — new import + map entries
-> - `typescript/infra/config/environments/mainnet3/rebalancer/<TOKEN>/<label>-config.yaml` — rebalancer config
->
-> Please create a PR for these changes. Suggested branch name: `<your-name>/add-warp-route-<token>-<chains>` (e.g. `troy/add-warp-route-rise-bsc-ethereum`).
->
-> If you'd like me to create the PR, say "create the PR" and I will run `gh pr create` for you.
+```bash
+git checkout -b <your-name>/add-warp-route-<token>-<chains>
+```
 
-If the user asks Claude to create the PR, use `gh pr create` with an appropriate title and body describing the warp route addition.
+Then stage and commit all changed files (warpIds.ts, .registryrc, agent config JSONs, and for multi-collateral: warpFees.ts, configGetter, warp.ts, rebalancer config):
+
+```bash
+git add typescript/infra/config/environments/mainnet3/warp/warpIds.ts
+git add .registryrc
+git add typescript/infra/config/environments/mainnet3/
+git add typescript/infra/config/warp.ts
+git commit -m "feat: add <TOKEN>/<chain1>-<chain2> warp route"
+git push -u origin HEAD
+```
+
+Then open the PR:
+
+```bash
+gh pr create \
+  --title "feat: add <TOKEN>/<chain1>-<chain2> warp route" \
+  --body "$(cat <<'EOF'
+## Summary
+
+Adds the `<TOKEN>/<chain1>-<chain2>` warp route to the monorepo.
+
+| Field | Value |
+| ----- | ----- |
+| **Linear** | <linear-issue-url> |
+| **Warp route ID** | `<TOKEN>/<chain1>-<chain2>` |
+| **Warp monitor** | [Grafana](https://abacusworks.grafana.net/d/ddz6ma94rnzswc/warp-routes?orgId=1&var-warp_route_id=<URL-encoded-warp-route-id>) |
+
+## Changes
+
+- `typescript/infra/config/environments/mainnet3/warp/warpIds.ts` — new `<EnumKey>` enum entry
+- `.registryrc` — updated to registry commit `<commit-hash>`
+- Agent config JSONs updated by `update-agent-config`
+
+**Multi-collateral routes also include:**
+
+- `typescript/infra/config/environments/mainnet3/governance/ica/warpFees.ts` — uncommented `<synthetic-chain>` entry
+- `typescript/infra/config/environments/mainnet3/warp/configGetters/get<Name>WarpConfig.ts` — new configGetter
+- `typescript/infra/config/warp.ts` — new import + map entries
+- `typescript/infra/config/environments/mainnet3/rebalancer/<TOKEN>/<label>-config.yaml` — rebalancer config
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+Fill in real values:
+
+- `<linear-issue-url>`: full Linear ticket URL(s). If multiple routes, list each on its own row in the table, e.g.:
+  ```
+  | **Linear** | [AW-548](...) · [AW-551](...) |
+  ```
+- Grafana URL: URL-encode the warp route ID (replace `/` with `%2F`, e.g. `RISE%2Fbsc-ethereum`). If multiple routes, list each on its own row.
+- `<commit-hash>`: the registry commit hash written to `.registryrc` in Step 3
+- Omit the multi-collateral section if all routes are simple routes
+- When batching multiple routes, repeat the warp route ID + Grafana rows for each route and list all changed files
+
+Show the user the PR URL when done.
 
 ---
 

@@ -241,7 +241,7 @@ cast call $ASSET "symbol()(string)" --rpc-url <RPC_URL>
 cast call $ASSET "name()(string)" --rpc-url <RPC_URL>
 ```
 
-The warp route directory and warp route ID also use the **underlying asset symbol** (e.g. `WETH/ethereum-igra`, not `waEthWETH/ethereum-igra`).
+The warp route directory and warp route ID also use the **underlying asset symbol** (e.g. `WETH/igra`, not `waEthWETH/igra`).
 
 ```yaml
 <collateral-chain>:
@@ -337,15 +337,17 @@ The `fee-owner-address` defaults to the chain's `owner` unless separately specif
 The deploy.yaml goes in the local registry at:
 
 ```
-$REGISTRY_PATH/deployments/warp_routes/<TOKEN>/<chain1>-<chain2>-deploy.yaml
+$REGISTRY_PATH/deployments/warp_routes/<TOKEN>/<new-chain>-deploy.yaml
 ```
 
 Where:
 
 - `<TOKEN>` is the token symbol (uppercase)
-- `<chain1>-<chain2>` are the chain names sorted alphabetically and joined with `-`
+- `<new-chain>` is the **primary new destination chain** — i.e., the new chain being added, typically the synthetic chain. Do NOT include all chains in the filename; using only the new chain creates a stable ID that doesn't change when additional chains are added later.
 
-Example for RISE on ethereum + bsc: `deployments/warp_routes/RISE/bsc-ethereum-deploy.yaml`
+Example: for USDS bridging from ethereum (collateral) to igra (synthetic), the file is `deployments/warp_routes/USDS/igra-deploy.yaml` — NOT `ethereum-igra-deploy.yaml`.
+
+Exception: if there is no clear "primary" new chain (e.g., both chains are new/co-equal), use just the synthetic or destination chain name.
 
 Check if a directory and/or file already exists. If it does, show the user the existing file and ask if they want to overwrite.
 
@@ -368,12 +370,14 @@ Do not proceed to Step 7 until the user confirms.
 The warp route ID is derived from the deploy.yaml output path:
 
 ```
-$REGISTRY_PATH/deployments/warp_routes/<TOKEN>/<chain1>-<chain2>-deploy.yaml
-                                        └──────────────────────────────────┘
-                                        Warp route ID = <TOKEN>/<chain1>-<chain2>
+$REGISTRY_PATH/deployments/warp_routes/<TOKEN>/<new-chain>-deploy.yaml
+                                        └─────────────────────────────┘
+                                        Warp route ID = <TOKEN>/<new-chain>
 ```
 
-Example: if the file is `deployments/warp_routes/RISE/bsc-ethereum-deploy.yaml`, the warp route ID is `RISE/bsc-ethereum`.
+Example: if the file is `deployments/warp_routes/USDS/igra-deploy.yaml`, the warp route ID is `USDS/igra`.
+
+The stable warp route ID uses only the primary new chain name (not all chains), so it stays constant if more chains are added to the route later.
 
 ### 7b: Identify Required Protocols
 

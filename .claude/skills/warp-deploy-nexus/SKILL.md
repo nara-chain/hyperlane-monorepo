@@ -11,15 +11,17 @@ You are adding a warp route to the Nexus UI whitelist.
 
 The user provides:
 
-- **Warp route ID** (required, e.g. `SOL/igra-solanamainnet`)
+- **One or more warp route IDs** (e.g. `SOL/igra`) and/or **Linear ticket URL(s)**
 
-If not provided, ask for it now.
+If Linear ticket URL(s) are provided, fetch each ticket to extract the warp route ID. If neither is provided, ask for them now.
+
+**When multiple routes are provided**, add all of them in a single PR (Steps 3–5 cover all routes at once).
 
 ---
 
-## Step 1: Confirm the warp route ID
+## Step 1: Confirm the warp route ID(s)
 
-Show the user the warp route ID you'll add and ask them to confirm before proceeding.
+Show the user the warp route IDs you'll add and ask them to confirm before proceeding.
 
 ---
 
@@ -40,7 +42,7 @@ git checkout nexus
 git pull origin nexus
 ```
 
-2. Create a new branch from `nexus`. Use the format `feat/<warp-route-id-slugified>` where the warp route ID is lowercased and `/` replaced with `-`:
+2. Create a new branch from `nexus`. For a single route use `feat/<warp-route-id-slugified>` (lowercase, `/` → `-`). For multiple routes use a descriptive slug like `feat/add-<token>-igra-routes`:
 
 ```bash
 git checkout -b feat/<slug>
@@ -58,11 +60,11 @@ $REPO_PATH/src/consts/warpRouteWhitelist.ts
 
 Read the file and add the warp route ID to the `warpRouteWhitelist` array. Insert it in alphabetical order by token symbol, then by chain string. Preserve existing formatting (single quotes, trailing comma on each entry).
 
-Example — adding `SOL/igra-solanamainnet` to an existing list:
+Example — adding `SOL/igra` to an existing list:
 
 ```typescript
 export const warpRouteWhitelist: Array<string> | null = [
-  'SOL/igra-solanamainnet',
+  'SOL/igra',
   'USDC/mainnet-cctp-v2-fast',
 ];
 ```
@@ -74,9 +76,11 @@ export const warpRouteWhitelist: Array<string> | null = [
 ```bash
 cd "$REPO_PATH"
 git add src/consts/warpRouteWhitelist.ts
-git commit -m "feat: add <WARP_ROUTE_ID> to Nexus whitelist"
+git commit -m "feat: add <WARP_ROUTE_ID(s)> to Nexus whitelist"
 git push origin <branch-name>
 ```
+
+For multiple routes, list them all in the commit message: `feat: add USDS, WETH, USDT igra routes to Nexus whitelist`.
 
 ---
 
@@ -84,11 +88,41 @@ git push origin <branch-name>
 
 Target branch is `nexus` (not `main`).
 
+For a single route:
+
 ```bash
 gh pr create \
   --base nexus \
   --title "feat: add <WARP_ROUTE_ID> to Nexus whitelist" \
-  --body "Adds \`<WARP_ROUTE_ID>\` to the Nexus UI warp route whitelist."
+  --body "$(cat <<'EOF'
+Adds `<WARP_ROUTE_ID>` to the Nexus UI warp route whitelist.
+
+| Field | Value |
+| ----- | ----- |
+| **Linear** | [<TICKET_ID>](<LINEAR_URL>) |
+| **Warp route** | `<WARP_ROUTE_ID>` |
+EOF
+)"
+```
+
+For multiple routes, list each route ID in the body. Combine all Linear ticket links in one row (comma-separated):
+
+```bash
+gh pr create \
+  --base nexus \
+  --title "feat: add <token> igra warp routes to Nexus whitelist" \
+  --body "$(cat <<'EOF'
+Adds the following warp routes to the Nexus UI whitelist:
+
+| Field | Value |
+| ----- | ----- |
+| **Linear** | [<TICKET_ID_1>](<LINEAR_URL_1>) · [<TICKET_ID_2>](<LINEAR_URL_2>) · [<TICKET_ID_3>](<LINEAR_URL_3>) |
+
+- `<WARP_ROUTE_ID_1>`
+- `<WARP_ROUTE_ID_2>`
+- `<WARP_ROUTE_ID_3>`
+EOF
+)"
 ```
 
 Show the user the PR URL when done.
