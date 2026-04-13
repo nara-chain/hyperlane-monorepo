@@ -231,38 +231,51 @@ The `tokenFee` on the synthetic chain lists ALL collateral chains in `feeContrac
 
 **For `collateralVault` type chains** (owner-yield ERC4626 — yield accrues to owner, not holders):
 
-> ⚠️ **Vault must be deployed before the warp route.** The `token` field is NOT the raw token being bridged — it is an ERC4626 vault wrapping the token. Use [hyperlane-xyz/Aave-Vault](https://github.com/hyperlane-xyz/Aave-Vault) to deploy the vault. Real-world examples: WETH/incentiv vault `0xB1ea329f0B79d0b213957569594ca2a9dE637215` (waEthWETH, wraps WETH), USDT/incentiv vault `0x04DA4b99FFc82f0e44DEd14c3539A6fDaD08E2fE` (wraps USDT).
+> ⚠️ **Vault must be deployed before the warp route.** The `token` field is the ERC4626 vault address, NOT the underlying asset. Use [hyperlane-xyz/Aave-Vault](https://github.com/hyperlane-xyz/Aave-Vault) to deploy the vault if one doesn't already exist. Real-world examples: WETH/incentiv vault `0xB1ea329f0B79d0b213957569594ca2a9dE637215` (waEthWETH, wraps WETH), USDT/incentiv vault `0x04DA4b99FFc82f0e44DEd14c3539A6fDaD08E2fE` (wraps USDT).
+
+**Name and symbol**: use the `name` and `symbol` of the **underlying asset** (from `asset()`), NOT the vault token. The vault is an implementation detail; users think of themselves as bridging the underlying token. Look up the underlying's name/symbol on-chain:
+
+```bash
+ASSET=$(cast call <vault-address> "asset()(address)" --rpc-url <RPC_URL>)
+cast call $ASSET "symbol()(string)" --rpc-url <RPC_URL>
+cast call $ASSET "name()(string)" --rpc-url <RPC_URL>
+```
+
+The warp route directory and warp route ID also use the **underlying asset symbol** (e.g. `WETH/ethereum-igra`, not `waEthWETH/ethereum-igra`).
 
 ```yaml
 <collateral-chain>:
-  decimals: <decimals>
+  decimals: <decimals> # decimals of the underlying asset
+  gas: 300000 # REQUIRED: vault withdrawal costs more than default 68k gas
   mailbox: '<mailbox-address>'
-  name: <token-name>
+  name: <underlying-asset-name> # from asset().name(), NOT vault name
   owner: '<owner-address>'
-  symbol: <token-symbol>
-  token: '<erc4626-vault-address>' # vault wrapping the token, NOT the token itself
+  symbol: <underlying-symbol> # from asset().symbol(), NOT vault symbol
+  token: '<erc4626-vault-address>' # vault address — NOT the underlying asset address
   type: collateralVault
 
 <synthetic-chain>:
   decimals: <decimals>
   mailbox: '<mailbox-address>'
-  name: <token-name>
+  name: <underlying-asset-name>
   owner: '<owner-address>'
-  symbol: <token-symbol>
+  symbol: <underlying-symbol>
   type: synthetic # standard synthetic — NOT syntheticRebase
 ```
 
+> ⚠️ **`gas: 300000` is required on the `collateralVault` chain.** Delivering to a collateralVault triggers an ERC4626 vault withdrawal, which costs ~430k gas — far above the default 68k `destinationGas`. Without this override the relayer underpays the IGP and the delivery transaction will revert. 300k was validated empirically on the WETH/igra route (required: ~430k total, IGP overhead: ~160k, so destinationGas needed: ~270k → 300k gives headroom).
+
 **For `collateralVaultRebase` type chains** (rebasing ERC4626 — yield auto-distributes to all bridged holders):
 
-> ⚠️ Same ERC4626 check as `collateralVault`: run `cast call <token> "asset()"` — if it returns a non-zero address, use the token directly; if it reverts, a vault must be deployed first.
+> ⚠️ Same ERC4626 check as `collateralVault`: run `cast call <token> "asset()"` — if it returns a non-zero address, use the token directly; if it reverts, a vault must be deployed first. Same name/symbol rule applies: use the underlying asset's name and symbol.
 
 ```yaml
 <collateral-chain>:
   decimals: <decimals>
   mailbox: '<mailbox-address>'
-  name: <token-name>
+  name: <underlying-asset-name>
   owner: '<owner-address>'
-  symbol: <token-symbol>
+  symbol: <underlying-symbol>
   token: '<erc4626-vault-address>'
   type: collateralVaultRebase
 
@@ -270,9 +283,9 @@ The `tokenFee` on the synthetic chain lists ALL collateral chains in `feeContrac
   collateralChainName: <collateral-chain> # REQUIRED for syntheticRebase
   decimals: <decimals>
   mailbox: '<mailbox-address>'
-  name: <token-name>
+  name: <underlying-asset-name>
   owner: '<owner-address>'
-  symbol: <token-symbol>
+  symbol: <underlying-symbol>
   type: syntheticRebase # ALL destinations must be syntheticRebase when collateralVaultRebase is used
 ```
 

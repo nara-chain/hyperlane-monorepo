@@ -165,6 +165,30 @@ Chain: ethereum
 
 For each **collateral chain**, check if the deployer holds the collateral token. For testing, 1 USD worth is sufficient.
 
+### Step 6a: Detect ERC4626 Vault Tokens
+
+Before checking balances, determine whether the collateral token is an ERC4626 vault. Call `asset()` on the token contract:
+
+```bash
+cast call <TOKEN_ADDRESS> "asset()(address)" --rpc-url <RPC_URL>
+```
+
+- If the call **succeeds and returns a non-zero address**, the token is an ERC4626 vault. Use the returned address as the **source token** for funding — the deployer needs the underlying asset, not the vault share.
+- If the call **reverts or returns zero**, the token is a standard ERC20 — proceed as normal.
+
+When an ERC4626 is detected, note it clearly:
+
+```
+Chain: ethereum (collateral)
+  Token: wsETH (0xAbc...) — ERC4626 vault
+  Underlying asset: wstETH (0xDef...)
+  → Funding will be requested in wstETH, not wsETH
+```
+
+For the rest of Step 6, replace `TOKEN_ADDRESS` with the underlying asset address when an ERC4626 is detected.
+
+### Step 6b: Check Balance
+
 ```bash
 # Get raw balance (returns token units in smallest denomination)
 cast call <TOKEN_ADDRESS> "balanceOf(address)(uint256)" <DEPLOYER_ADDRESS> --rpc-url <RPC_URL>
@@ -192,13 +216,13 @@ For well-known tokens, use these approximate prices if CoinGecko fails:
 - WETH: same as ETH price
 - WBTC: check ETH price × ~15 (rough ratio, not reliable — prefer API)
 
-**Threshold: 1 USD worth of collateral token**
+**Threshold: 1 USD worth of collateral token** (or its underlying asset if ERC4626)
 
 Report:
 
-- ✅ **OK** — holds >= 1 USD of collateral token
+- ✅ **OK** — holds >= 1 USD of collateral token (or underlying asset)
 - ⚠️ **LOW** — holds > 0 but < 1 USD (may be enough if price is just unavailable)
-- ❌ **NONE** — zero balance — must acquire some collateral token for testing
+- ❌ **NONE** — zero balance — must acquire some for testing
 
 When insufficient:
 
@@ -207,6 +231,15 @@ Chain: ethereum (collateral)
   Token: USDC (0xA0b8...)
   Balance: 0 USDC
   ❌  Need at least 1 USD of USDC for testing. Request from faucet or transfer a small amount.
+```
+
+For ERC4626 vaults with insufficient underlying asset:
+
+```
+Chain: ethereum (collateral)
+  Token: wsETH (0xAbc...) — ERC4626 vault → underlying: wstETH (0xDef...)
+  Balance: 0 wstETH
+  ❌  Need at least 1 USD of wstETH (underlying asset) for testing.
 ```
 
 ---
@@ -281,6 +314,8 @@ pnpm tsx scripts/funding/fund-wallet-from-deployer-key.ts \
   -c <CHAIN> \
   -t <TOKEN_ADDRESS>
 ```
+
+**ERC4626 vaults**: use the **underlying asset address** (from `asset()`) as `<TOKEN_ADDRESS>`, not the vault token address. The deployer needs the underlying asset to test the route; the vault share is not what gets transferred during bridging tests.
 
 ### Amount calculation
 
