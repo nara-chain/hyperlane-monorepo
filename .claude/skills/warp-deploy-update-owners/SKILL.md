@@ -229,6 +229,7 @@ Adds the `<TOKEN>/<chain1>-<chain2>` warp route.
 
 | Field | Value |
 | ----- | ----- |
+| **Linear** | <linear-issue-url> |
 | **Token** | <token-name> (<TOKEN>) |
 | **Route type** | <e.g. native → synthetic, collateral → synthetic> |
 | **Chains** | <chain1> (<type>), <chain2> (<type>), ... |
