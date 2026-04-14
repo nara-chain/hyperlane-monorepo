@@ -170,6 +170,14 @@ cat "$REGISTRY_PATH/chains/<chain>/addresses.yaml" | grep "^mailbox:"
 
 If a chain is not found in the registry, warn the user — the chain may not have a Hyperlane deployment yet.
 
+**For Sealevel chains (solanamainnet, eclipsemainnet):** also look up the IGP address:
+
+```bash
+cat "$REGISTRY_PATH/chains/<chain>/addresses.yaml" | grep "^interchainGasPaymaster:"
+```
+
+Save this address — it is used as the `hook` field in Step 4.
+
 ---
 
 ## Step 4: Generate deploy.yaml
@@ -320,6 +328,23 @@ The warp route directory and warp route ID also use the **underlying asset symbo
 ```
 
 The `fee-owner-address` defaults to the chain's `owner` unless separately specified.
+
+**Sealevel chain rules (solanamainnet, eclipsemainnet, etc.):** For any Sealevel chain in the route, add two extra fields regardless of token type (`native`, `synthetic`, `collateral`, etc.):
+
+- `hook`: the IGP address looked up in Step 3 (the `interchainGasPaymaster` value from that chain's `addresses.yaml`)
+- `gas: 300000`: sending to Solana costs more than the default 68k gas
+
+Example:
+
+```yaml
+solanamainnet:
+  decimals: 9
+  gas: 300000
+  hook: '<igp-address-from-registry>'
+  mailbox: '<mailbox-address>'
+  owner: '<owner-address>'
+  type: native
+```
 
 **Rules:**
 
