@@ -170,11 +170,18 @@ cat "$REGISTRY_PATH/chains/<chain>/addresses.yaml" | grep "^mailbox:"
 
 If a chain is not found in the registry, warn the user — the chain may not have a Hyperlane deployment yet.
 
-**For Sealevel chains (solanamainnet, eclipsemainnet):** also look up the IGP address:
+**For Sealevel chains (solanamainnet, eclipsemainnet):** also look up the IGP address from the monorepo's program-ids.json (NOT from addresses.yaml):
 
 ```bash
-cat "$REGISTRY_PATH/chains/<chain>/addresses.yaml" | grep "^interchainGasPaymaster:"
+cat "rust/sealevel/environments/mainnet3/<chain>/core/program-ids.json" | python3 -c "import sys,json; print(json.load(sys.stdin)['igp_program_id'])"
 ```
+
+Known values (verify against the file before using):
+
+| Chain          | igp_program_id                                 |
+| -------------- | ---------------------------------------------- |
+| solanamainnet  | `BhNcatUDC2D5JTyeaqrdSukiVFsEHK7e3hVmKMztwefv` |
+| eclipsemainnet | `Hs7KVBU67nBnWhDPZkEFwWqrFMUfJbmY2DQ4gmCZfaZp` |
 
 Save this address — it is used as the `hook` field in Step 4.
 
