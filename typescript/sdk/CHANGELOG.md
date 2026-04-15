@@ -1,5 +1,22 @@
 # @hyperlane-xyz/sdk
 
+## 32.0.0
+
+### Patch Changes
+
+- e4da110: Fixed routing fee for non-evm legs
+- d588eb5: Replaced z.coerce.bigint().positive() with ZBigNumberish.refine() in TokenMetadataSchema scale field for zod-to-json-schema compatibility. Fixed validateZodResult generic to correctly return output type for schemas with transforms.
+- Updated dependencies [fa08f2a]
+  - @hyperlane-xyz/provider-sdk@5.0.0
+  - @hyperlane-xyz/cosmos-sdk@32.0.0
+  - @hyperlane-xyz/radix-sdk@32.0.0
+  - @hyperlane-xyz/aleo-sdk@32.0.0
+  - @hyperlane-xyz/tron-sdk@23.0.0
+  - @hyperlane-xyz/deploy-sdk@5.0.0
+  - @hyperlane-xyz/starknet-core@32.0.0
+  - @hyperlane-xyz/utils@32.0.0
+  - @hyperlane-xyz/core@11.3.1
+
 ## 31.2.1
 
 ### Patch Changes
