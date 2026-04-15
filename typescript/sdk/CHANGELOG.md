@@ -1,5 +1,74 @@
 # @hyperlane-xyz/sdk
 
+## 31.2.1
+
+### Patch Changes
+
+- f9c8f83: Replaced z.coerce.bigint().positive() with pipe-based coercion in TokenMetadataSchema scale field to fix zod-to-json-schema compatibility in the registry build.
+  - @hyperlane-xyz/aleo-sdk@31.2.1
+  - @hyperlane-xyz/starknet-core@31.2.1
+  - @hyperlane-xyz/cosmos-sdk@31.2.1
+  - @hyperlane-xyz/radix-sdk@31.2.1
+  - @hyperlane-xyz/utils@31.2.1
+  - @hyperlane-xyz/deploy-sdk@4.3.4
+  - @hyperlane-xyz/core@11.3.1
+  - @hyperlane-xyz/provider-sdk@4.3.4
+  - @hyperlane-xyz/tron-sdk@22.1.14
+
+## 31.2.0
+
+### Minor Changes
+
+- 35fb5c8: Shared scale conversion helpers were exported, and WarpCore preserved legacy collateral checks for mixed-decimal routes when scale metadata is missing.
+
+### Patch Changes
+
+- @hyperlane-xyz/aleo-sdk@31.2.0
+- @hyperlane-xyz/starknet-core@31.2.0
+- @hyperlane-xyz/cosmos-sdk@31.2.0
+- @hyperlane-xyz/radix-sdk@31.2.0
+- @hyperlane-xyz/utils@31.2.0
+- @hyperlane-xyz/deploy-sdk@4.3.3
+- @hyperlane-xyz/core@11.3.1
+- @hyperlane-xyz/provider-sdk@4.3.3
+- @hyperlane-xyz/tron-sdk@22.1.13
+
+## 31.1.0
+
+### Minor Changes
+
+- c8fe242: Added request retries when fetching contract verification status from etherscan like apis to avoid having an incorrect status due to rate limits
+
+### Patch Changes
+
+- 8a082af: Added light subpath exports for SDK provider and warp modules, plus lean widget subpath exports.
+- 8a082af: Added runtime entrypoints for non-EVM SDKs and avoided bundling heavy deploy-time modules in UI wallet integrations.
+- Updated dependencies [8a082af]
+  - @hyperlane-xyz/aleo-sdk@31.1.0
+  - @hyperlane-xyz/cosmos-sdk@31.1.0
+  - @hyperlane-xyz/radix-sdk@31.1.0
+  - @hyperlane-xyz/tron-sdk@22.1.12
+  - @hyperlane-xyz/deploy-sdk@4.3.2
+  - @hyperlane-xyz/starknet-core@31.1.0
+  - @hyperlane-xyz/utils@31.1.0
+  - @hyperlane-xyz/core@11.3.1
+  - @hyperlane-xyz/provider-sdk@4.3.2
+
+## 31.0.1
+
+### Patch Changes
+
+- Updated dependencies [d5168fc]
+  - @hyperlane-xyz/utils@31.0.1
+  - @hyperlane-xyz/core@11.3.1
+  - @hyperlane-xyz/aleo-sdk@31.0.1
+  - @hyperlane-xyz/cosmos-sdk@31.0.1
+  - @hyperlane-xyz/deploy-sdk@4.3.1
+  - @hyperlane-xyz/provider-sdk@4.3.1
+  - @hyperlane-xyz/radix-sdk@31.0.1
+  - @hyperlane-xyz/tron-sdk@22.1.11
+  - @hyperlane-xyz/starknet-core@31.0.1
+
 ## 31.0.0
 
 ### Major Changes

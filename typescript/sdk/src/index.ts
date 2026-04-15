@@ -448,15 +448,17 @@ export {
   SendTransactionOptions,
 } from './providers/MultiProvider.js';
 export {
+  defaultProviderBuilderMap,
+  protocolToDefaultProviderBuilder,
+  ProviderBuilderMap,
+} from './providers/defaultProviderBuilderMaps.js';
+export {
   defaultEthersV5ProviderBuilder,
   defaultFuelProviderBuilder,
   defaultProviderBuilder,
-  defaultProviderBuilderMap,
   defaultSolProviderBuilder,
   defaultViemProviderBuilder,
-  protocolToDefaultProviderBuilder,
   ProviderBuilderFn,
-  ProviderBuilderMap,
   TypedProviderBuilderFn,
 } from './providers/providerBuilders.js';
 export {
@@ -911,12 +913,20 @@ export {
 } from './types.js';
 export { getCosmosRegistryChain } from './utils/cosmos.js';
 export {
+  alignLocalAmountToMessage,
   DEFAULT_SCALE,
+  localAmountFromMessage,
+  messageAmountFromLocal,
+  minLocalAmountForMessage,
   normalizeScale,
   scalesEqual,
   verifyScale,
 } from './utils/decimals.js';
-export type { NormalizedScale, ScaleInput } from './utils/decimals.js';
+export type {
+  NormalizedScale,
+  ScaleAlignment,
+  ScaleInput,
+} from './utils/decimals.js';
 export { filterByChains } from './utils/filter.js';
 export {
   ANVIL_RPC_METHODS,

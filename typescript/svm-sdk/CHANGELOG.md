@@ -1,5 +1,34 @@
 # @hyperlane-xyz/sealevel-sdk
 
+## 31.2.1
+
+### Patch Changes
+
+- @hyperlane-xyz/utils@31.2.1
+- @hyperlane-xyz/provider-sdk@4.3.4
+
+## 31.2.0
+
+### Patch Changes
+
+- @hyperlane-xyz/utils@31.2.0
+- @hyperlane-xyz/provider-sdk@4.3.3
+
+## 31.1.0
+
+### Patch Changes
+
+- @hyperlane-xyz/utils@31.1.0
+- @hyperlane-xyz/provider-sdk@4.3.2
+
+## 31.0.1
+
+### Patch Changes
+
+- Updated dependencies [d5168fc]
+  - @hyperlane-xyz/utils@31.0.1
+  - @hyperlane-xyz/provider-sdk@4.3.1
+
 ## 31.0.0
 
 ### Patch Changes
