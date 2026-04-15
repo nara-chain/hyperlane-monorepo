@@ -16,7 +16,7 @@ use hyperlane_base::{
         Settings,
     },
 };
-use hyperlane_core::{cfg_unwrap_all, config::*, HyperlaneDomain, U256};
+use hyperlane_core::{cfg_unwrap_all, config::*, HyperlaneDomain, H256, U256};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -73,6 +73,21 @@ pub struct RelayerSettings {
     pub tx_id_indexing_enabled: bool,
     /// Whether to enable IGP indexing.
     pub igp_indexing_enabled: bool,
+    /// Dust-attack filter: drops warp-route messages whose TokenMessage amount is below
+    /// `min_amount`, matching by origin domain and (optionally) sender address.
+    /// Applied in `MessageDbLoader::tick` after whitelist/blacklist checks.
+    pub origin_amount_filters: Vec<OriginAmountFilter>,
+}
+
+/// Per-route minimum-amount filter used to drop dust warp-route messages.
+#[derive(Debug, Clone)]
+pub struct OriginAmountFilter {
+    /// Origin domain this rule applies to.
+    pub origin_domain: u32,
+    /// Optional sender address (warp-route program ID as H256); `None` matches any sender.
+    pub sender: Option<H256>,
+    /// Threshold below which a message is permanently dropped.
+    pub min_amount: U256,
 }
 
 /// Config for gas payment enforcement
@@ -369,6 +384,13 @@ impl FromRawConf<RawRelayerSettings> for RelayerSettings {
             .parse_bool()
             .unwrap_or(true);
 
+        let origin_amount_filters = p
+            .get_opt_key("originAmountFilters")
+            .take_config_err_flat(&mut err)
+            .and_then(parse_json_array)
+            .map(|(path, raw)| parse_origin_amount_filters(path, &raw, &mut err))
+            .unwrap_or_default();
+
         err.into_result(RelayerSettings {
             base,
             db,
@@ -387,8 +409,45 @@ impl FromRawConf<RawRelayerSettings> for RelayerSettings {
             max_retries: max_message_retries,
             tx_id_indexing_enabled,
             igp_indexing_enabled,
+            origin_amount_filters,
         })
     }
+}
+
+fn parse_origin_amount_filters(
+    path: ConfigPath,
+    raw: &Value,
+    err: &mut ConfigParsingError,
+) -> Vec<OriginAmountFilter> {
+    let parser = ValueParser::new(path, raw);
+    parser
+        .into_array_iter()
+        .map(|itr| {
+            itr.filter_map(|item| {
+                let origin_domain = item
+                    .chain(err)
+                    .get_key("originDomain")
+                    .parse_u32()
+                    .end()?;
+                let sender = item
+                    .chain(err)
+                    .get_opt_key("sender")
+                    .parse_address_hash()
+                    .end();
+                let min_amount = item
+                    .chain(err)
+                    .get_key("minAmount")
+                    .parse_u256()
+                    .end()?;
+                Some(OriginAmountFilter {
+                    origin_domain,
+                    sender,
+                    min_amount,
+                })
+            })
+            .collect_vec()
+        })
+        .unwrap_or_default()
 }
 
 fn parse_ism_cache_configs(p: ValueParser) -> ConfigResult<Vec<IsmCacheConfig>> {

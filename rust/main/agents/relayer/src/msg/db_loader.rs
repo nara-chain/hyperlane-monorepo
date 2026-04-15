@@ -14,13 +14,17 @@ use hyperlane_base::{
     db::{HyperlaneDb, HyperlaneRocksDB},
     CoreMetrics,
 };
-use hyperlane_core::{HyperlaneDomain, HyperlaneMessage, QueueOperation};
+use hyperlane_core::{Decode, HyperlaneDomain, HyperlaneMessage, QueueOperation};
+use hyperlane_warp_route::TokenMessage;
 use prometheus::IntGauge;
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{debug, instrument, trace};
+use tracing::{debug, instrument, trace, warn};
 
 use super::{blacklist::AddressBlacklist, metadata::AppContextClassifier, pending_message::*};
-use crate::{db_loader::DbLoaderExt, settings::matching_list::MatchingList};
+use crate::{
+    db_loader::DbLoaderExt,
+    settings::{matching_list::MatchingList, OriginAmountFilter},
+};
 
 /// Finds unprocessed messages from an origin and submits then through a channel
 /// for to the appropriate destination.
@@ -32,6 +36,9 @@ pub struct MessageDbLoader {
     message_blacklist: Arc<MatchingList>,
     /// Addresses that messages may not interact with.
     address_blacklist: Arc<AddressBlacklist>,
+    /// Dust-attack filter: drops warp-route messages whose TokenMessage amount is
+    /// below a per-(origin, sender) minimum threshold.
+    origin_amount_filters: Arc<Vec<OriginAmountFilter>>,
     metrics: MessageDbLoaderMetrics,
     /// channel for each destination chain to send operations (i.e. message
     /// submissions) to
@@ -56,9 +63,14 @@ impl ForwardBackwardIterator {
     fn new(db: Arc<dyn HyperlaneDb>) -> Self {
         let high_nonce = db.retrieve_highest_seen_message_nonce().ok().flatten();
         let domain = db.domain().name().to_owned();
+        // HACK: If no highest seen nonce in DB, use a per-domain starting nonce.
+        // Solana has 360k+ messages, skip to near tip. Nara starts from 0.
+        let start_nonce = match high_nonce {
+            Some(n) => n,
+            None => if domain == "solanamainnet" { 364500 } else { 0 },
+        };
         let high_nonce_iter = DirectionalNonceIterator::new(
-            // If the high nonce is None, we start from the beginning
-            high_nonce.unwrap_or_default().into(),
+            start_nonce.into(),
             NonceDirection::High,
             db.clone(),
             domain.clone(),
@@ -285,6 +297,12 @@ impl DbLoaderExt for MessageDbLoader {
                 return Ok(());
             }
 
+            // Drop dust warp-route messages below the configured minimum amount.
+            // Permanently marks the nonce as processed so the relayer never retries.
+            if self.drop_if_below_min_amount(&msg)? {
+                return Ok(());
+            }
+
             // Skip if the message is intended for a destination we do not service
             if !self.send_channels.contains_key(&destination) {
                 debug!(?msg, "Message destined for unknown domain, skipping");
@@ -332,6 +350,7 @@ impl MessageDbLoader {
         message_whitelist: Arc<MatchingList>,
         message_blacklist: Arc<MatchingList>,
         address_blacklist: Arc<AddressBlacklist>,
+        origin_amount_filters: Arc<Vec<OriginAmountFilter>>,
         metrics: MessageDbLoaderMetrics,
         send_channels: HashMap<u32, UnboundedSender<QueueOperation>>,
         destination_ctxs: HashMap<u32, Arc<MessageContext>>,
@@ -342,6 +361,7 @@ impl MessageDbLoader {
             message_whitelist,
             message_blacklist,
             address_blacklist,
+            origin_amount_filters,
             metrics,
             send_channels,
             destination_ctxs,
@@ -349,6 +369,58 @@ impl MessageDbLoader {
             nonce_iterator: ForwardBackwardIterator::new(Arc::new(db) as Arc<dyn HyperlaneDb>),
             max_retries,
         }
+    }
+
+    /// Returns the first matching filter for this message, if any.
+    fn matching_origin_amount_filter(
+        &self,
+        msg: &HyperlaneMessage,
+    ) -> Option<&OriginAmountFilter> {
+        self.origin_amount_filters.iter().find(|f| {
+            f.origin_domain == msg.origin && f.sender.is_none_or(|s| s == msg.sender)
+        })
+    }
+
+    /// If a matching dust filter exists and the message's TokenMessage amount is below
+    /// the threshold, log a warning, permanently mark the nonce as processed, and return
+    /// Ok(true). Otherwise returns Ok(false). Messages whose body is not a TokenMessage
+    /// are passed through unchanged.
+    fn drop_if_below_min_amount(&self, msg: &HyperlaneMessage) -> Result<bool> {
+        let Some(filter) = self.matching_origin_amount_filter(msg) else {
+            return Ok(false);
+        };
+
+        let mut cursor = std::io::Cursor::new(&msg.body);
+        let token_msg = match TokenMessage::read_from(&mut cursor) {
+            Ok(tm) => tm,
+            Err(e) => {
+                debug!(
+                    ?msg,
+                    err = ?e,
+                    "Body is not a TokenMessage, skipping amount filter"
+                );
+                return Ok(false);
+            }
+        };
+
+        if token_msg.amount() >= filter.min_amount {
+            return Ok(false);
+        }
+
+        warn!(
+            message_id = ?msg.id(),
+            origin = msg.origin,
+            sender = ?msg.sender,
+            nonce = msg.nonce,
+            amount = %token_msg.amount(),
+            threshold = %filter.min_amount,
+            "Dropping small-amount warp route message below threshold (dust filter)"
+        );
+        self.nonce_iterator
+            .high_nonce_iter
+            .db
+            .store_processed_by_nonce(&msg.nonce, &true)?;
+        Ok(true)
     }
 
     async fn try_get_unprocessed_message(&mut self) -> Result<Option<HyperlaneMessage>> {

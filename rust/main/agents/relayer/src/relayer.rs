@@ -55,7 +55,7 @@ use crate::{
         pending_message::MessageContext,
     },
     server::{self as relayer_server},
-    settings::{matching_list::MatchingList, RelayerSettings},
+    settings::{matching_list::MatchingList, OriginAmountFilter, RelayerSettings},
 };
 
 use destination::{Destination, FactoryError};
@@ -87,6 +87,7 @@ pub struct Relayer {
     message_whitelist: Arc<MatchingList>,
     message_blacklist: Arc<MatchingList>,
     address_blacklist: Arc<AddressBlacklist>,
+    origin_amount_filters: Arc<Vec<OriginAmountFilter>>,
     transaction_gas_limit: Option<U256>,
     skip_transaction_gas_limit_for: HashSet<u32>,
     allow_local_checkpoint_syncers: bool,
@@ -190,6 +191,7 @@ impl BaseAgent for Relayer {
         let message_whitelist = Arc::new(settings.whitelist);
         let message_blacklist = Arc::new(settings.blacklist);
         let address_blacklist = Arc::new(AddressBlacklist::new(settings.address_blacklist));
+        let origin_amount_filters = Arc::new(settings.origin_amount_filters);
         let skip_transaction_gas_limit_for = settings.skip_transaction_gas_limit_for;
         let transaction_gas_limit = settings.transaction_gas_limit;
 
@@ -284,6 +286,7 @@ impl BaseAgent for Relayer {
             message_whitelist,
             message_blacklist,
             address_blacklist,
+            origin_amount_filters,
             transaction_gas_limit,
             skip_transaction_gas_limit_for,
             allow_local_checkpoint_syncers: settings.allow_local_checkpoint_syncers,
@@ -866,6 +869,7 @@ impl Relayer {
             self.message_whitelist.clone(),
             self.message_blacklist.clone(),
             self.address_blacklist.clone(),
+            self.origin_amount_filters.clone(),
             metrics,
             send_channels,
             destination_ctxs,

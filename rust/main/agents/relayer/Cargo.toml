@@ -60,6 +60,7 @@ hyperlane-sealevel = { path = "../../chains/hyperlane-sealevel" }
 solana-sdk.workspace = true
 hyperlane-metric = { path = "../../hyperlane-metric" }
 hyperlane-operation-verifier = { path = "../../applications/hyperlane-operation-verifier" }
+hyperlane-warp-route = { path = "../../applications/hyperlane-warp-route" }
 lander = { path = "../../lander" }
 
 [dev-dependencies]

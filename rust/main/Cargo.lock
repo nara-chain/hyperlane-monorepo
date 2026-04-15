@@ -9277,6 +9277,7 @@ dependencies = [
  "hyperlane-operation-verifier",
  "hyperlane-sealevel",
  "hyperlane-test",
+ "hyperlane-warp-route",
  "itertools 0.10.5",
  "lander",
  "maplit",
