@@ -3,7 +3,7 @@
 use access_control::AccessControl;
 use account_utils::{create_pda_account, SizedData};
 use borsh::{BorshDeserialize, BorshSerialize};
-use hyperlane_core::{Decode, Encode};
+use hyperlane_core::{Decode, Encode, U256};
 use hyperlane_sealevel_connection_client::{
     gas_router::{GasRouterConfig, HyperlaneGasRouterAccessControl, HyperlaneGasRouterDispatch},
     router::{
@@ -303,6 +303,21 @@ where
         }
         if token_account.owner != program_id {
             return Err(ProgramError::IncorrectProgramId);
+        }
+
+        // Dust-attack mitigation: for 6-decimal tokens (USDC, USDT) require a minimum
+        // transfer amount. Prevents dust bridges whose sole purpose is to force the
+        // destination chain's ata_payer to pay fresh-ATA rent that the attacker then
+        // reclaims by closing the account. Native (non-SPL, e.g. SOL) and other
+        // decimalings are unaffected.
+        const MIN_AMOUNT_6DEC: u64 = 1_000_000; // 1.0 for 6-decimal tokens
+        if token.decimals == 6 && xfer.amount_or_id < U256::from(MIN_AMOUNT_6DEC) {
+            msg!(
+                "Rejecting transfer_remote: amount {} below minimum {} for 6-decimal token",
+                xfer.amount_or_id,
+                MIN_AMOUNT_6DEC
+            );
+            return Err(ProgramError::InvalidInstructionData);
         }
 
         // Account 3: Mailbox program
